@@ -1,0 +1,7 @@
+{
+    "workload": "socialfeed-react",
+    "commit": "b8a75e04bb161605a8b9f3e4c73aecb0155a5979",
+    "dirty": [],
+    "built": true,
+    "dist": "workloads/socialfeed-react/dist"
+}
