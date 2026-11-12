@@ -724,11 +724,10 @@
     g.Node = Node;
 
     // Hyperion looks for window's EventTarget.prototype in the window's
-    // prototype chain. The shell's global object prototype can't be changed,
-    // so point EventTarget.prototype at the global object's existing
-    // prototype instead. Node keeps the original prototype with the event
-    // methods.
-    EventTarget.prototype = Object.getPrototypeOf(g);
+    // prototype chain. The global object prototype can't be changed, so use
+    // Object.prototype, which is in both the window and DOM prototype chains.
+    // Node keeps the original prototype with the event methods.
+    EventTarget.prototype = Object.prototype;
 
     class CharacterData extends Node {
         constructor(data = "") {

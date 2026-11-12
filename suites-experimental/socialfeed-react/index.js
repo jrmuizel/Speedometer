@@ -29,96 +29,6 @@ if (typeof loadRelativeToScript === "function")
 else
     load(workloadBase + "polyfill.js");
 
-const isD8 = typeof os !== "undefined" && typeof os.d8Path === "string";
-
-function installD8HyperionStubs() {
-    // d8's global prototype shape makes Hyperion's property interceptors
-    // recurse. The app only uses Hyperion for instrumentation, so provide
-    // inert modules and leave the DOM untouched.
-    __d("ErrorGuard", ["ErrorPubSub"], function (global, require, requireLazy, unused, module, exports) {
-        let depth = 0;
-        const names = [];
-        function applyWithGuard(fn, context, args, options) {
-            depth++;
-            names.push((options && options.name) || fn.name || "anonymous");
-            try {
-                return fn.apply(context, args);
-            } catch (error) {
-                const ErrorPubSub = require("ErrorPubSub");
-                const pub = ErrorPubSub.default || ErrorPubSub;
-                if (pub && pub.reportError)
-                    pub.reportError(error, { name: names[names.length - 1], depth });
-                if (options && options.rethrow)
-                    throw error;
-                return undefined;
-            } finally {
-                names.pop();
-                depth--;
-            }
-        }
-        function guard(fn, name) {
-            if (fn.__guarded)
-                return fn.__guarded;
-            const guarded = function () {
-                return applyWithGuard(fn, this, arguments, { name });
-            };
-            fn.__guarded = guarded;
-            return guarded;
-        }
-        exports.applyWithGuard = applyWithGuard;
-        exports.guard = guard;
-        exports.inGuard = () => depth > 0;
-    });
-
-    __d("FlowContext", [], function (global, require, requireLazy, unused, module, exports) {
-        Object.defineProperty(exports, "__esModule", { value: true });
-        let currentFlow = null;
-        let nextId = 1;
-        class Flow {
-            constructor(name, parent) {
-                this.id = nextId++;
-                this.name = name;
-                this.parent = parent;
-                this.data = null;
-            }
-            fullName() {
-                return this.parent ? `${this.parent.fullName()}/${this.name}` : this.name;
-            }
-        }
-        const interactionEvents = new Set(["click", "keydown", "input", "beforeinput", "focusin", "mouseover", "submit", "scroll"]);
-        const flowContext = {
-            current: () => currentFlow,
-            bind(flow, callback) {
-                return function () {
-                    const previous = currentFlow;
-                    currentFlow = flow;
-                    try {
-                        return callback.apply(this, arguments);
-                    } finally {
-                        currentFlow = previous;
-                    }
-                };
-            },
-            onEvent(event) {
-                if (interactionEvents.has(event.type))
-                    currentFlow = new Flow(event.type, null);
-            },
-            onNavigation(url) {
-                currentFlow = new Flow(`nav:${url}`, currentFlow);
-            },
-            start(name) {
-                currentFlow = new Flow(name, currentFlow);
-                return currentFlow;
-            },
-        };
-        exports.default = flowContext;
-    });
-
-    __d("hyperionDOM", [], function (global, require, requireLazy, unused, module, exports) {});
-    __d("IPromise", [], function (global, require, requireLazy, unused, module, exports) {});
-    __d("MethodInterceptor", [], function (global, require, requireLazy, unused, module, exports) {});
-}
-
 function readText(path) {
     if (typeof __readWorkloadFile === "function")
         return __readWorkloadFile(path);
@@ -150,10 +60,6 @@ function loadWorkloadPage() {
 
         const type = script.getAttribute("type");
         const src = script.getAttribute("src");
-        if (isD8 && src && src.includes("RZJEA8s9kj.js")) {
-            installD8HyperionStubs();
-            continue;
-        }
         if (type === "module") {
             // speedometer.mjs only connects the benchmark harness to the
             // parent frame. This runner drives the workload directly.
@@ -172,11 +78,6 @@ function loadWorkloadPage() {
             document.head.appendChild(script);
             continue;
         }
-
-        // Start the app ourselves so that d8 can disable Hyperion first. Its
-        // prototype interceptors recurse in d8's global/prototype setup.
-        if (/requireLazy\(\["SocialFeedApp"\]/.test(contents))
-            continue;
 
         // Inline scripts run at their position in the page, after the JSON
         // payloads and module chunks that precede them.
@@ -356,16 +257,6 @@ async function runStep(name, callback) {
 
 async function run() {
     loadWorkloadPage();
-
-    if (isD8 && !window.socialWorkload) {
-        await new Promise((resolve) => {
-            requireLazy(["HyperionSetup"], (hyperion) => {
-                if (hyperion)
-                    hyperion.installHyperion = () => {};
-                resolve();
-            });
-        });
-    }
 
     if (!window.socialWorkload) {
         requireLazy(["SocialFeedApp"], (app) => {
