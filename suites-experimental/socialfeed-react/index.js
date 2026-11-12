@@ -7,7 +7,10 @@
 //
 // Usage: js index.js
 
-load("polyfill.js");
+if (typeof loadRelativeToScript === "function")
+    loadRelativeToScript("polyfill.js");
+else
+    load("polyfill.js");
 
 function readText(path) {
     if (typeof __readWorkloadFile === "function")
