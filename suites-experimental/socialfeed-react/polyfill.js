@@ -89,7 +89,7 @@
     g.requestIdleCallback = (callback) => g.setTimeout(() => callback({ didTimeout: false, timeRemaining: () => 50 }), 0);
     g.cancelIdleCallback = (id) => g.clearTimeout(id);
 
-    let scriptDir = "";
+    let scriptDir = g.__speedometerScriptBase || "";
     if (typeof scriptPath === "string") {
         const normalized = scriptPath.replace(/\\/g, "/");
         scriptDir = normalized.slice(0, normalized.lastIndexOf("/") + 1);
@@ -105,6 +105,15 @@
             return read(scriptDir + path);
         throw new Error("No file reader for " + path);
     }
+
+    function loadFile(path) {
+        if (typeof loadRelativeToScript === "function")
+            return loadRelativeToScript(path);
+        if (typeof load === "function")
+            return load(scriptDir + path);
+        throw new Error("No file loader for " + path);
+    }
+    g.__loadWorkloadFile = loadFile;
 
     function writeFile(path, contents) {
         if (typeof os !== "undefined" && os.file && os.file.writeTypedArrayToFile) {
@@ -1935,7 +1944,7 @@
             return;
         const path = "dist/" + src.replace(/^\.?\//, "");
         try {
-            loadRelativeToScript(path);
+            loadFile(path);
             if (typeof script.onload === "function")
                 g.setTimeout(() => script.onload({ type: "load", target: script }), 0);
         } catch (error) {
