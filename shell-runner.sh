@@ -5,6 +5,7 @@ suite_dirs=(
   "Backbone:resources/todomvc/architecture-examples/backbone/index.js"
   "React:resources/todomvc/architecture-examples/react/index.js"
   "React-redux:resources/todomvc/architecture-examples/react-redux/index.js"
+  "SocialFeed-React:suites-experimental/socialfeed-react/index.js"
 )
 suite_dirs_keys=("${suite_dirs[@]%%:*}")
 verbose=false
