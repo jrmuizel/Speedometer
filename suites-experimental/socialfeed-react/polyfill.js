@@ -723,11 +723,9 @@
     Node.DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC = 32;
     g.Node = Node;
 
-    // Hyperion looks for window's EventTarget.prototype in the window's
-    // prototype chain. The global object prototype can't be changed, so use
-    // Object.prototype, which is in both the window and DOM prototype chains.
-    // Node keeps the original prototype with the event methods.
-    EventTarget.prototype = Object.prototype;
+    // Keep the real EventTarget prototype, with addEventListener and
+    // friends, so Hyperion can intercept those methods once instead of
+    // adding a pending wrapper for every DOM node it sees.
 
     class CharacterData extends Node {
         constructor(data = "") {
@@ -2468,6 +2466,24 @@
     g.Window = Window;
     g.History = History;
 
+    // Hyperion requires window's prototype chain to include the
+    // EventTarget prototype. The global object's prototype cannot be changed,
+    // so expose a window object with the expected chain over the global.
+    let shellWindow = null;
+    shellWindow = new Proxy(g, {
+        getPrototypeOf() { return Window.prototype; },
+        get(target, property, receiver) {
+            if (property === "window" || property === "self")
+                return shellWindow;
+            return Reflect.get(target, property, receiver);
+        },
+        set(target, property, value) {
+            return Reflect.set(target, property, value, target);
+        },
+    });
+    g.window = shellWindow;
+    g.self = shellWindow;
+
     class Document extends Node {
         constructor() {
             super(9, "#document");
@@ -2567,6 +2583,7 @@
     g.HTMLDocument = HTMLDocument;
     g.document = new HTMLDocument();
     g.document.location = g.location;
+    g.document.defaultView = g.window;
     g.getSelection = () => g.document.getSelection();
     for (const name of Object.getOwnPropertyNames(Node)) {
         if (/_NODE$/.test(name) || /^DOCUMENT_POSITION/.test(name))
